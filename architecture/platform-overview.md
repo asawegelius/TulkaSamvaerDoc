@@ -23,7 +23,7 @@ Spring Boot backend (one modular app, Spring Modulith)        see ADR-001
   shared/     error model, paging, base entity, clock
         |
         v
-PostgreSQL (tables per module, Flyway per module)  +  media storage (disk or S3)
+PostgreSQL (tables per module, Liquibase changelogs per module)  +  media storage (disk or S3)
 ```
 
 ## Sections
@@ -61,7 +61,7 @@ PostgreSQL (tables per module, Flyway per module)  +  media storage (disk or S3)
 
 ## Adding a section
 
-1. Backend module `sections/<key>` with `api`, `application`, `domain`, `infrastructure`; Flyway migrations in `db/migration/<key>/`.
+1. Backend module `sections/<key>` with `api`, `application`, `domain`, `infrastructure`; Liquibase changelogs in `db/changelog/<key>/`, included from the master changelog (see [ADR-006](../decisions/ADR-006-liquibase-migrations.md)).
 2. Register the section in `platform/sections`.
 3. Frontend feature `features/<key>` built from existing layouts; add it to `SECTIONS`.
 4. Regenerate the API client; add mock data for frontend work.
