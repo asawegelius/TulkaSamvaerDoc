@@ -1,6 +1,14 @@
-# Documents template
+# Tulka documentation
 
-A shared documentation structure for people and development agents. Connect project intent, decisions, behavior and verification in Git.
+Requirements, decisions, architecture and verification records for **Tulka**, a members webapp for family and friends around a farmhouse whose barn is a guest apartment and pottery studio. Sections include a shared calendar, booking, events, recipes, chat and a garden diary; a robot workshop and a music studio are planned.
+
+The app is an Angular frontend ([AngularAWTemplate](https://github.com/asawegelius/AngularAWTemplate)) and a Spring Boot backend, structured so that each section is one frontend feature plus one backend module. Start with the [platform overview](architecture/platform-overview.md) and the [decisions](decisions/README.md).
+
+This repository follows [documents-template](https://github.com/asawegelius/documents-template).
+
+## Domains
+
+Documentation domains match the section keys: `BOOKING`, `CALENDAR`, `EVENTS`, `RECIPES`, `CHAT`, `GARDEN`, platform domains `IDENTITY`, `GROUPS`, `VISIBILITY`, `MEDIA`, and `SYSTEM` for system-wide requirements. Planned: `ROBOT`, `MUSIC`.
 
 ## Start here
 
@@ -21,6 +29,8 @@ Agents also read [AGENTS.md](AGENTS.md). People and agents use the same artifact
 | [decisions/](decisions/README.md) | Significant design decisions and their consequences |
 | [traceability/](traceability/README.md) | Requirement coverage and visible gaps |
 | [glossary/](glossary/README.md) | Shared meaning of domain terms |
+| [architecture/](architecture/README.md) | Platform and per-module service overviews |
+| [api/](api/README.md) | API conventions and endpoint contracts |
 | [git-strategy/](git-strategy/README.md) | Branching, review and release guidance |
 | [templates/](templates/README.md) | Reusable starting documents |
 | [examples/](examples/README.md) | Illustrative records, excluded from live project coverage |
