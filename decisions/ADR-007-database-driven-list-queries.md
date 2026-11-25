@@ -31,13 +31,13 @@ Production runs PostgreSQL; development and tests use H2 in PostgreSQL mode. The
 **Proposed.** Lists are read with hand-written PostgreSQL queries; Hibernate/JPA remains only for writing aggregates.
 
 1. **SQL access:** `JdbcClient` with named parameters. A builder appends one fixed fragment per active filter and maps sort keys from an enum. User input is only ever bound as a parameter.
-2. **Visibility as data:** a trigger-maintained `events_event_audience (audience_key, event_id)` table replaces the four-branch visibility predicate with one indexed `EXISTS`.
-3. **Search:** a generated `tsvector` column (`simple` configuration) with a GIN index gives word-prefix matching from the first character; `pg_trgm` GIN indexes add substring matching from 3 characters. Frontend debounce 250 ms, `switchMap` cancels superseded requests.
+2. **Visibility as data:** a trigger-maintained `events_event_audience (audience_key, event_id)` table replaces the four-branch visibility predicate with one indexed `EXISTS`. Access to a `GROUPS` event comes from the groups or an explicit access grant, never from an answer alone. When the host narrows visibility, a preview lists who loses access, the host picks who keeps it, answers stay as history, lost "Going" answers are cancelled and the members are notified (design 3.2.1).
+3. **Search:** every search word must match on its own, as a word prefix from the first character (generated `tsvector`, `simple` configuration, GIN index) or as a substring from 3 characters (`pg_trgm` GIN indexes). Frontend debounce 250 ms inside `switchMap`, so each keystroke cancels the request in flight and stale responses are never shown.
 4. **Deterministic order:** every sort ends with the unique `id`; each sort has a matching partial index `(sort columns, id) WHERE cancelled_at IS NULL`.
-5. **Paging:** keyset (cursor) paging with `LIMIT n + 1`. The cursor is opaque and bound to the filters and sort. Offset paging is kept only for future numbered admin tables.
+5. **Paging:** keyset (cursor) paging. A materialized CTE selects at most `limit + 1` ids first; RSVP and bring-list aggregates run only for the returned rows. The cursor is opaque and bound to the filters and sort. Offset paging is kept only for future numbered admin tables.
 6. **Total counts:** a striped counter table `events_count (dimension, key, slot, n)` maintained by statement-level triggers in the writing transaction, with ordered upserts to avoid deadlocks. It covers totals that are dimensions of the data: all active events, public events, events per host, events per group.
 7. **Filtered counts:** a separate exact `count(*)` over the same predicate, capped per list (1000 for Events, configurable; no global cap), requested only on the first page or when filters change, and run in the same `REPEATABLE READ READ ONLY` snapshot as that page.
-8. **Live updates:** statement-level triggers call `pg_notify` with event ids and affected audience keys (no content). Each application instance listens on one dedicated connection and pushes hints over Server-Sent Events to the sessions whose audience keys match. Clients coalesce hints and refetch from the database.
+8. **Live updates:** statement-level triggers call `pg_notify` with event ids and affected audience keys (no content), falling back to `resync` when the finished payload reaches 7900 bytes. Each application instance listens on one dedicated connection and pushes hints over Server-Sent Events to the sessions whose audience keys match. Clients coalesce hints and refetch from the database.
 9. **No result caching:** no client-side or server-side result cache; list responses send `Cache-Control: no-store`.
 10. **Tests and development on PostgreSQL:** Testcontainers for integration tests and Docker Compose for local development replace H2.
 
@@ -92,10 +92,10 @@ Production runs PostgreSQL; development and tests use H2 in PostgreSQL mode. The
 
 After approval, in order. Owner of each: Åsa Wegelius (review), implementation by the assigned developer.
 
-1. Requirements: add the 90-day rule and "delete my events older than x days" as Events requirements, and open an issue for GDPR handling of invited friends' data.
+1. Requirements: add the 90-day rule, "delete my events older than x days" and the access rule for narrowing visibility (preview, keep access, cancel and notify) as Events requirements, and open an issue for GDPR handling of invited friends' data.
 2. Move tests to Testcontainers PostgreSQL and `dev` to Docker Compose. Acceptance: existing specs pass on PostgreSQL.
 3. Liquibase changesets: missing foreign-key indexes, 90-day check constraint, `ON DELETE CASCADE` on child foreign keys, search column and indexes, audience table and triggers, counter table and triggers, notify triggers. Acceptance: parity and counter specs pass; drift query returns no rows.
-4. `EventListQuery`, `EventCountQuery`, `EventTotals` and the batched "delete older than" endpoint with `JdbcClient`; remove `findVisible` and `default_batch_fetch_size`. Acceptance: `EXPLAIN` of the default list shows an index scan without a sort node on a seeded dataset of at least 100,000 events; keyset spec under concurrent writes passes.
+4. `EventListQuery`, `EventCountQuery`, `EventTotals` and the batched "delete older than" endpoint with `JdbcClient`; remove `findVisible` and `default_batch_fetch_size`. Acceptance: `EXPLAIN` of the default list shows an index scan without a sort node on a seeded dataset of at least 100,000 events; `EXPLAIN (ANALYZE, BUFFERS)` of a common and a rare one-character search each stays under 50 ms and 2,000 buffers on that dataset (otherwise the GIN-first fallback in design 5.2 is built); search contract, keyset and cursor specs pass.
 5. Contract change in TulkaSamvaerWeb `api/openapi.yaml` and the mock; frontend search, filters, URL state, debounce.
 6. `ChangeListener`, `SseHub`, `/api/v1/events/changes`; frontend `EventSource` handling. Acceptance: notification specs pass; a change appears in a second browser session within 2 seconds.
 7. Load test with concurrent readers, typers and writers; record results here.

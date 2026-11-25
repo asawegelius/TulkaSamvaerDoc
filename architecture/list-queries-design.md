@@ -75,11 +75,39 @@ CREATE INDEX ix_events_event_audience_event ON events_event_audience (event_id);
 |:-----------|:--------------|
 | `ONLY_ME` | host |
 | `ALL_MEMBERS` | host, sentinel `00000000-0000-0000-0000-000000000000` |
-| `GROUPS` | host, each group id, each member with a row in `events_answer` |
+| `GROUPS` | host, each group id, each member with an active access grant (section 3.2.1) |
 
 A viewer's keys are `{sentinel, own member id, own group ids}`, fetched once per request from `GroupDirectory`. Visibility becomes `EXISTS (SELECT 1 FROM events_event_audience v WHERE v.event_id = e.id AND v.audience_key = ANY(:keys))`, served by the primary key. Member ids and group ids are both random UUIDs, so they do not collide.
 
-The rows are maintained by triggers on `events_event`, `events_event_group` and `events_answer`, in the same transaction as the change. A parity test asserts that the table and `Visibility.allows` agree for every combination. The table holds ids only and joins no other module's tables, so [ADR-001](../decisions/ADR-001-one-modular-spring-boot-app.md) still holds.
+The rows are maintained by triggers on `events_event`, `events_event_group` and `events_access_grant`, in the same transaction as the change. A parity test asserts that the table and `Visibility.allows` agree for every combination. The table holds ids only and joins no other module's tables, so [ADR-001](../decisions/ADR-001-one-modular-spring-boot-app.md) still holds.
+
+#### 3.2.1 Who keeps access when the host narrows visibility
+
+Today any row in `events_answer` gives access to a `GROUPS` event, also a "Can't". When a host changes `ALL_MEMBERS` to `GROUPS` (or removes a group, or changes to `ONLY_ME`), everyone who ever answered would silently keep access. The proposal separates access from answers:
+
+```sql
+CREATE TABLE events_access_grant (
+  event_id   uuid        NOT NULL REFERENCES events_event(id) ON DELETE CASCADE,
+  member_id  uuid        NOT NULL,
+  granted_at timestamptz NOT NULL,
+  granted_by uuid        NOT NULL,
+  reason     varchar(10) NOT NULL,   -- INVITED or KEPT
+  PRIMARY KEY (event_id, member_id)
+);
+
+ALTER TABLE events_answer
+  ADD COLUMN access_removed_at    timestamptz,   -- set when the member lost access; the answer stays as history
+  ADD COLUMN attendance_cancelled boolean NOT NULL DEFAULT false;
+```
+
+- **Rule (one rule for `Visibility.allows` and `events_event_audience`):** a member sees an event if they are the host, or the scope is `ALL_MEMBERS`, or the scope is `GROUPS` and they are in one of its groups or have an access grant. An answer alone never gives access. The parity test covers every scope change below.
+- Inviting a member creates a grant (`INVITED`) and a `PENDING` answer, as today.
+- **Narrowing visibility is a two-step change.** `POST /api/v1/events/{id}/visibility-preview` with the new visibility answers the members who would lose access: everyone outside the new groups who has an answer or a grant, with their current answer. By default only the host and the chosen groups keep access; the host ticks the members who should keep it (with `ONLY_ME` nobody can be kept).
+- The confirmation shows the host who loses access and whose "Going" is cancelled. `PUT /api/v1/events/{id}` then carries the new visibility, `keepAccess: [memberIds]` and the event `version`.
+- In the same transaction the server recomputes the affected set. If it differs from what the preview showed (someone answered in between), it answers 409 with a fresh preview instead of saving. Otherwise it creates `KEPT` grants for the ticked members, deletes the other grants, and sets `access_removed_at` on the answers of members who lose access. A `GOING` answer also gets `attendance_cancelled = true`; the original status stays as history.
+- Answers with `access_removed_at` are left out of the guest list, the RSVP counts and the "my answer" filter.
+- After commit, the events module publishes `EventAccessRemoved(eventId, memberId, attendanceCancelled)`. The messaging module tells each member that they no longer have access and, where it applies, that their sign-up was cancelled. The message names only the event title they had already seen. Their open sessions get the change hint through the old audience keys (section 3.4) and drop the event.
+- Widening visibility again does not restore removed access automatically; the host invites the member again.
 
 ### 3.3 Counter table
 
@@ -123,15 +151,20 @@ Statement level matters: creating a weekly series inserts about 104 occurrences 
 Statement-level `AFTER INSERT`, `AFTER UPDATE` and `AFTER DELETE` triggers (one per operation, each with the transition tables it needs) on `events_event`, `events_event_audience`, `events_answer`, `events_bring_item`, `events_claim`, `events_programme_item`, `events_sleeping_spot` call one function that sends:
 
 ```sql
-PERFORM pg_notify('events_changed', json_build_object(
+payload := json_build_object(
   'ids',  (SELECT array_agg(DISTINCT event_id) FROM changed),
   'keys', (SELECT array_agg(DISTINCT audience_key) FROM old_and_new_audience)
-)::text);
+)::text;
+IF octet_length(payload) >= 7900 THEN      -- the limit is "shorter than 8000 bytes" in the default build
+  payload := '{"resync": true}';
+END IF;
+PERFORM pg_notify('events_changed', payload);
 ```
 
 - PostgreSQL delivers a notification only when the transaction commits, and drops identical payloads within one transaction. A rolled-back change never reaches a browser.
 - The payload holds ids and audience keys only, never titles or other content.
-- A payload is limited to 8000 bytes. When a statement touches more than about 100 events, the function sends `{"resync": true}` instead.
+- A payload must be shorter than 8000 bytes in the default PostgreSQL build, and a longer one makes `pg_notify` raise an error, which would fail the user's write. The function therefore measures the finished JSON text in bytes (ids and keys together, so one event shared with many groups and guests counts too) and sends `{"resync": true}` from 7900 bytes, leaving a margin.
+- `resync` is routed to every session of the instance, because the payload no longer says who is affected.
 
 ### 3.5 Indexes
 
@@ -162,7 +195,7 @@ The list's date window is an overlap test (`ends_at >= :from AND starts_at < :to
 
 | Parameter | Meaning |
 |:----------|:--------|
-| `q` | free text; every word must match as a word prefix (from 1 character) or, from 3 characters, as a substring of title or location |
+| `q` | free text, up to 8 words. Every word must match on its own (AND across words): as the start of a word in title, location or description (from 1 character), or, for words of 3 characters or more, anywhere inside title or location |
 | `kind` | repeatable: `GATHERING`, `BIRTHDAY`, `HOLIDAY`, `TRIP`, `OTHER` |
 | `host` | member id, or `me` |
 | `group` | repeatable group id (events shared with any of them) |
@@ -198,48 +231,66 @@ Response:
 
 - Spring `JdbcClient` with named parameters, mapping rows straight into the response records. No entities are loaded for lists.
 - A small builder appends a fixed SQL fragment per active filter. Absent filters add nothing, so the planner never sees `(:x IS NULL OR ...)` branches that spoil plans. Sort keys come from an enum that maps to fixed `ORDER BY` and keyset fragments. User input is only ever a bound parameter.
-- The search string is normalised in Java to words of letters and digits (`[\p{L}\p{N}]+`), lowercased, and bound as one tsquery string such as `fød:* & mor:*`. Operator characters never reach `to_tsquery`.
+- The search string is normalised in Java to words of letters and digits (`[\p{L}\p{N}]+`), lowercased, at most 8 words. Each word gets its own predicate and its own bound parameters (`tok:*` for the prefix, `%tok%` for the substring). Operator characters never reach `to_tsquery`.
 - Each list request sets `SET LOCAL statement_timeout = '2s'` in its read-only transaction, so a pathological query cannot hold a connection.
 
 ### 5.2 Page query (default sort, with search and keyset)
 
+The query first picks the page's ids, then aggregates only for those rows. The `MATERIALIZED` CTE with its own `ORDER BY ... LIMIT` is an optimisation fence: whatever plan the database chooses for the filters, the aggregates can only see at most `limit + 1` rows, and they run for at most `limit`.
+
 ```sql
+WITH page AS MATERIALIZED (
+  SELECT e.id, e.starts_at,
+         row_number() OVER (ORDER BY e.starts_at, e.id) AS rn
+  FROM events_event e
+  WHERE e.cancelled_at IS NULL
+    AND EXISTS (SELECT 1 FROM events_event_audience v
+                WHERE v.event_id = e.id AND v.audience_key = ANY(:keys))
+    AND e.ends_at >= :from AND e.starts_at < :to
+    AND e.starts_at >= :from - interval '90 days'
+    -- fragments below only when the filter is present
+    AND e.kind = ANY(:kinds)
+    -- one block per search word; the ILIKE part only for words of 3+ characters
+    AND (e.search_vector @@ to_tsquery('simple', :w1Prefix)
+         OR e.title ILIKE :w1Like OR e.location ILIKE :w1Like)
+    AND (e.search_vector @@ to_tsquery('simple', :w2Prefix))
+    -- keyset fragment only when "after" is present
+    AND (e.starts_at, e.id) > (:afterStartsAt, :afterId)
+  ORDER BY e.starts_at, e.id
+  LIMIT :limit + 1
+)
 SELECT e.id, e.kind, e.title, e.starts_at, e.ends_at, e.all_day, e.location,
        e.host_id, e.visibility_scope, e.series_id, e.version,
-       my.status                         AS my_rsvp,
+       my.status                                   AS my_rsvp,
        r.going, r.maybe, r.cant, r.pending,
-       b.items, b.taken
-FROM events_event e
+       b.items, b.taken,
+       (SELECT count(*) FROM page) > :limit        AS has_more
+FROM page p
+JOIN events_event e ON e.id = p.id
 LEFT JOIN events_answer my
-       ON my.event_id = e.id AND my.member_id = :viewer
+       ON my.event_id = e.id AND my.member_id = :viewer AND my.access_removed_at IS NULL
 LEFT JOIN LATERAL (
        SELECT count(*) FILTER (WHERE a.status = 'GOING')   AS going,
               count(*) FILTER (WHERE a.status = 'MAYBE')   AS maybe,
               count(*) FILTER (WHERE a.status = 'CANT')    AS cant,
               count(*) FILTER (WHERE a.status = 'PENDING') AS pending
-       FROM events_answer a WHERE a.event_id = e.id) r ON true
+       FROM events_answer a
+       WHERE a.event_id = e.id AND a.access_removed_at IS NULL) r ON true
 LEFT JOIN LATERAL (
        SELECT count(*) AS items,
               count(*) FILTER (WHERE EXISTS (SELECT 1 FROM events_claim c WHERE c.item_id = i.id)) AS taken
        FROM events_bring_item i WHERE i.event_id = e.id) b ON true
-WHERE e.cancelled_at IS NULL
-  AND EXISTS (SELECT 1 FROM events_event_audience v
-              WHERE v.event_id = e.id AND v.audience_key = ANY(:keys))
-  AND e.ends_at >= :from AND e.starts_at < :to
-  AND e.starts_at >= :from - interval '90 days'
-  -- fragments below only when the filter is present
-  AND e.kind = ANY(:kinds)
-  AND (e.search_vector @@ to_tsquery('simple', :tsquery)
-       OR e.title ILIKE :likeTerm OR e.location ILIKE :likeTerm)   -- ILIKE only for terms of 3+ characters
-  -- keyset fragment only when "after" is present
-  AND (e.starts_at, e.id) > (:afterStartsAt, :afterId)
-ORDER BY e.starts_at, e.id
-LIMIT :limit + 1;
+WHERE p.rn <= :limit
+ORDER BY p.rn;
 ```
 
-- `LIMIT :limit + 1` tells whether a next page exists without counting. The extra row is not returned.
-- The `LATERAL` aggregates run only for the at most 101 rows that survive the limit, using `events_answer (event_id, status)` and `events_bring_item (event_id)`.
+The example has two search words: `w1` with 3 or more characters, `w2` with fewer.
+
+- The extra row (`rn = limit + 1`) only sets `has_more`; it is never aggregated or returned. The cursor is built from the last returned row.
+- The aggregates use `events_answer (event_id, status)` and `events_bring_item (event_id)`.
 - Host names and group names live in other modules. They are fetched with one `IN (...)` call per page through `MemberDirectory` and `GroupDirectory`, which is explicit SQL, not Hibernate batch fetching.
+
+**Rare one-character search.** Even with the fence, filling a small page can be expensive when the term is rare: if the planner walks the `(starts_at, id)` index in sort order, it may examine many visible events before it finds 21 that match "x". The other plan (GIN bitmap on `search_vector`, then sort the matches) is cheap for rare terms and expensive for common ones. Both cases are measured with `EXPLAIN (ANALYZE, BUFFERS)` on the seeded dataset: a common one-character term, a rare one-character term, and a rare term with an early `from`. The acceptance limit is in the follow-up work. If the rare case exceeds it, the fallback is to pick the plan in the builder: for search words of 1 to 2 characters, collect the matching ids from the GIN index first in a `MATERIALIZED` CTE (capped like the filtered count) and sort only those.
 
 ### 5.3 Deterministic order
 
@@ -254,13 +305,23 @@ Every sort ends with `e.id`, which is unique, so two rows never tie and a page b
 | Jump to page 7, "page 3 of 12" | not possible | possible |
 | Fits | "Show more", infinite scroll | numbered pages in an admin table |
 
+**What the cursor guarantees.** The cursor is a position in the sort order, not a snapshot. Between two "Show more" calls:
+
+- a row whose sort values did not change is returned exactly once;
+- an inserted row appears if it sorts after the cursor, otherwise only at the next refresh;
+- a deleted or cancelled row simply is not returned;
+- a row whose sort value changed across the cursor (for example its start date or title was edited) can be returned a second time or be skipped.
+
+The client therefore keys the list by `id`: a repeated row replaces the earlier copy at its new position. A skipped row cannot be detected by the client, but the edit that moved it also sends a change hint, and the refresh in section 8.2 puts it back. Offset paging has the same problem for edited rows and additionally for every insert and delete.
+
 The Events list uses "Show more", so the proposal is keyset. Offset stays available in the shared builder for a future admin table with numbered pages, capped at a maximum offset.
 
 ### 5.5 Search from the first character
 
 - Word prefix (`tok:*` against the GIN tsvector index) works from one character: "f" finds "Fødselsdag" and "Farmor". This is the main path.
 - Substring inside a word ("dag" in "fødselsdag") needs trigrams, which require 3 characters. From 3 characters the query adds the `ILIKE` branch, served by the trigram indexes.
-- A one-character search matches many rows. The page query is still cheap because it stops after `limit + 1` rows in sort order; the planner either walks the sort index and checks the condition, or uses the GIN bitmap and sorts the matches. The filtered count is the expensive part, which is why it is capped (section 6.2).
+- A common one-character search matches many rows; the page stops after `limit + 1` of them, and the filtered count is capped (section 6.2). A rare one-character search is the harder case for the page query, see "Rare one-character search" in section 5.2.
+- Example of the per-word contract: `mor dag` finds "Mormors fødselsdag", because `mor` is the start of "Mormors" and `dag` (3 characters) occurs inside "fødselsdag". `mor da` does not, because `da` is too short for a substring match and no word starts with it.
 - Results are ordered by the chosen sort, not by relevance, so they stay deterministic and keyset-pageable. A relevance sort (`ts_rank`, then `id`) can be added later as one more sort key, but it cannot use an index for its order.
 
 ## 6. Counts
@@ -332,7 +393,17 @@ WHERE e.id IN (
 
 ## 7. Frontend behaviour
 
-- The search field emits on every keystroke; the stream applies `debounceTime(250)`, trims, `distinctUntilChanged`, then `switchMap`, which cancels the previous HTTP request when a new one starts. There is no minimum length: one character searches.
+- The search field emits on every keystroke. The debounce sits inside the `switchMap`, so every keystroke cancels the request in flight at once, not only when the next request starts:
+
+  ```ts
+  query$.pipe(
+    map(q => q.trim()),
+    distinctUntilChanged(),
+    switchMap(q => timer(250).pipe(switchMap(() => api.listEvents({ ...filters, q, count: true })))),
+  )
+  ```
+
+  With a plain `debounceTime(250)` before `switchMap`, an older response could arrive while the new search is still waiting for its debounce, and would be shown for text the user has already changed. As a second guard the result carries the query it answers, and the page ignores it unless it equals the current field value. There is no minimum length: one character searches.
 - Filters live in the URL query parameters, so reload and back keep them.
 - No `shareReplay`, store-level result cache or HTTP cache. The list held on screen is display state, replaced on every new query and refreshed on change hints.
 - Changing a filter or sort clears the list and the cursor and asks for `count=true`.
@@ -351,7 +422,8 @@ Cancelling the HTTP request does not stop a query already running in PostgreSQL;
 ### 8.2 How the client reacts
 
 - Hints are coalesced for 1 second, plus a random 0–500 ms delay so many sessions do not refetch at the same instant.
-- List page: re-run the current query from the top with `limit` equal to the number of loaded rows (at most 100), and `count=true`. New matches appear in place, deleted or cancelled ones disappear, edits show. The client never patches rows from the push itself.
+- List page: re-run the current query from the top until it covers as many rows as are loaded, in requests of at most 100 rows (the first with `count=true`), and swap the list when the last one arrives. New matches appear in place, deleted or cancelled ones disappear, edits show. The client never patches rows from the push itself.
+- More than 100 loaded rows: the chunks are read in sequence with cursors, so one refresh of 250 rows is three requests. Each chunk is its own snapshot, so the "what the cursor guarantees" rules (section 5.4) apply between chunks; the list is keyed by `id`, so a row edited during the refresh is never shown twice. To bound the cost, a refresh covers at most 500 rows; when more are loaded, the list is cut back to the first 500 and "Show more" continues from there. The user keeps the scroll position, anchored on the first visible event's id; if that event is gone, on the nearest one before it.
 - Detail page: if its id is in the hint, refetch it. If the host's edit form is open and `version` changed, show "This event was changed by someone else".
 - After reconnecting, or on `{"resync": true}`, refetch everything on screen. Notifications sent while a listener was disconnected are lost (NOTIFY is not durable), so the server also sends `resync` to all its sessions after its LISTEN connection reconnects.
 - When a member joins or leaves a group, the groups module publishes a domain event; `SseHub` refreshes that member's keys and sends `resync`.
@@ -381,7 +453,7 @@ Expectations below are design reasoning, not measurements. They are to be confir
 | Concurrent writers on the same key | serialised only within one of 8 slots; no deadlocks thanks to ordered upserts |
 | Series creation (about 104 rows) | statement-level triggers: one aggregate upsert and one notification, not 104 |
 | Open SSE connections | no database connection per session; one LISTEN connection per instance; with virtual threads (`spring.threads.virtual.enabled`) an open stream costs memory, not a platform thread |
-| A change seen by many sessions | each refetches once after coalescing and jitter; every refetch is a page query of at most 100 rows |
+| A change seen by many sessions | each refetches once after coalescing and jitter; a refresh is one page query per 100 loaded rows, at most 5 |
 | No result cache | repeated queries rely on PostgreSQL's shared buffers; the hot part (recent events, indexes) stays in memory at this data size |
 
 ## 10. Testing consequences
@@ -392,4 +464,9 @@ H2 cannot run tsvector, GIN or trigram indexes, PL/pgSQL triggers or LISTEN/NOTI
 - counter equals `count(*)` after inserts, cancels, restores, visibility changes, series creation and concurrent writers;
 - keyset paging under concurrent inserts and deletes returns no duplicates and no gaps;
 - every sort is total (no ties) and matches its index (`EXPLAIN` shows an index scan, no sort node, for the default list);
-- notifications arrive only after commit, never after rollback, and only for viewers who can see or could see the event.
+- notifications arrive only after commit, never after rollback, and only for viewers who can see or could see the event;
+- one event with so many audience keys that the payload would reach 7900 bytes sends `resync`, and the write still succeeds;
+- narrowing visibility: the preview lists exactly the members who lose access; unticked members lose access while their answer stays as history; a lost "Going" is cancelled and notified; a change between preview and save answers 409;
+- search contract: `mor dag` finds "Mormors fødselsdag" (`mor` as word prefix, `dag` as substring); `f` finds "Farmor"; `da` does not find "fødselsdag" (substring needs 3 characters);
+- frontend: a response for an older search is never shown once the user has typed again, also while the new search is still waiting for its debounce;
+- cursor: an event whose start time is edited between two "Show more" calls is shown at most once in the list after the following refresh.
