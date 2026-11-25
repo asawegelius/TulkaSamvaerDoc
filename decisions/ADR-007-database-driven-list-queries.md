@@ -36,7 +36,7 @@ Production runs PostgreSQL; development and tests use H2 in PostgreSQL mode. The
 4. **Deterministic order:** every sort ends with the unique `id`; each sort has a matching partial index `(sort columns, id) WHERE cancelled_at IS NULL`.
 5. **Paging:** keyset (cursor) paging with `LIMIT n + 1`. The cursor is opaque and bound to the filters and sort. Offset paging is kept only for future numbered admin tables.
 6. **Total counts:** a striped counter table `events_count (dimension, key, slot, n)` maintained by statement-level triggers in the writing transaction, with ordered upserts to avoid deadlocks. It covers totals that are dimensions of the data: all active events, public events, events per host, events per group.
-7. **Filtered counts:** a separate exact `count(*)` over the same predicate, capped at 1000 rows, requested only on the first page or when filters change, and run in the same `REPEATABLE READ READ ONLY` snapshot as that page.
+7. **Filtered counts:** a separate exact `count(*)` over the same predicate, capped per list (1000 for Events, configurable; no global cap), requested only on the first page or when filters change, and run in the same `REPEATABLE READ READ ONLY` snapshot as that page.
 8. **Live updates:** statement-level triggers call `pg_notify` with event ids and affected audience keys (no content). Each application instance listens on one dedicated connection and pushes hints over Server-Sent Events to the sessions whose audience keys match. Clients coalesce hints and refetch from the database.
 9. **No result caching:** no client-side or server-side result cache; list responses send `Cache-Control: no-store`.
 10. **Tests and development on PostgreSQL:** Testcontainers for integration tests and Docker Compose for local development replace H2.
@@ -71,7 +71,7 @@ Production runs PostgreSQL; development and tests use H2 in PostgreSQL mode. The
   - NOTIFY is not durable; clients must resync after reconnecting.
   - The counter cannot express a time window ("from today") or an exact per-viewer total; those are filtered counts.
   - The list API contract changes (`page` becomes `after`/`limit`, new filters, `filteredCount`); web and mock must follow.
-  - The overlap window needs a longest-event rule (or a GiST range index) to stay index-friendly.
+  - Events may last at most 90 days, so the overlap window stays index-friendly; a longer stay is entered as two events.
 
 ## Related artifacts
 
@@ -81,23 +81,24 @@ Production runs PostgreSQL; development and tests use H2 in PostgreSQL mode. The
 - [ADR-005](ADR-005-login-approach.md): the SSE stream relies on the session cookie
 - [ADR-006](ADR-006-liquibase-migrations.md): new changesets, PostgreSQL-only `sql` changesets
 
-## Open questions for the owner
+## Owner answers (2026-11-25)
 
-1. **Which totals should the UI show?** Proposed: "x of y matching" in the list from the filtered count, plus counter-backed totals where they are meaningful ("My events", per group, public). The module-wide total includes private events and would be visible to administrators only.
-2. **Longest event:** may we add a validation rule, for example at most 90 days per event, so the date window stays index-friendly? Otherwise a GiST range index is used.
-3. **Filter set:** text, kind, host, group, my answer, series, date window. Anything missing (for example "has open bring-list items")?
-4. **Filtered count cap:** 1000 proposed.
+1. **Totals:** the list shows "x of y", where y is the filtered count. Counter-backed totals cover "My events", per group and public events; the module-wide total is for administrators only.
+2. **Longest event:** at most 90 days per event, validated in the API and enforced by a check constraint. No automatic retention for now; a member can delete their own events that ended more than x days ago (design section 6.3). GDPR for friends invited by friends is a later issue.
+3. **Filter set:** text, kind, host, group, my answer, series and date window are enough.
+4. **Filtered count cap:** 1000 for Events. The cap is set per list and configurable, never global.
 
 ## Follow-up work
 
 After approval, in order. Owner of each: Åsa Wegelius (review), implementation by the assigned developer.
 
-1. Move tests to Testcontainers PostgreSQL and `dev` to Docker Compose. Acceptance: existing specs pass on PostgreSQL.
-2. Liquibase changesets: missing foreign-key indexes, search column and indexes, audience table and triggers, counter table and triggers, notify triggers. Acceptance: parity and counter specs pass; drift query returns no rows.
-3. `EventListQuery`, `EventCountQuery`, `EventTotals` with `JdbcClient`; remove `findVisible` and `default_batch_fetch_size`. Acceptance: `EXPLAIN` of the default list shows an index scan without a sort node on a seeded dataset of at least 100,000 events; keyset spec under concurrent writes passes.
-4. Contract change in TulkaSamvaerWeb `api/openapi.yaml` and the mock; frontend search, filters, URL state, debounce.
-5. `ChangeListener`, `SseHub`, `/api/v1/events/changes`; frontend `EventSource` handling. Acceptance: notification specs pass; a change appears in a second browser session within 2 seconds.
-6. Load test with concurrent readers, typers and writers; record results here.
+1. Requirements: add the 90-day rule and "delete my events older than x days" as Events requirements, and open an issue for GDPR handling of invited friends' data.
+2. Move tests to Testcontainers PostgreSQL and `dev` to Docker Compose. Acceptance: existing specs pass on PostgreSQL.
+3. Liquibase changesets: missing foreign-key indexes, 90-day check constraint, `ON DELETE CASCADE` on child foreign keys, search column and indexes, audience table and triggers, counter table and triggers, notify triggers. Acceptance: parity and counter specs pass; drift query returns no rows.
+4. `EventListQuery`, `EventCountQuery`, `EventTotals` and the batched "delete older than" endpoint with `JdbcClient`; remove `findVisible` and `default_batch_fetch_size`. Acceptance: `EXPLAIN` of the default list shows an index scan without a sort node on a seeded dataset of at least 100,000 events; keyset spec under concurrent writes passes.
+5. Contract change in TulkaSamvaerWeb `api/openapi.yaml` and the mock; frontend search, filters, URL state, debounce.
+6. `ChangeListener`, `SseHub`, `/api/v1/events/changes`; frontend `EventSource` handling. Acceptance: notification specs pass; a change appears in a second browser session within 2 seconds.
+7. Load test with concurrent readers, typers and writers; record results here.
 
 ## Replacement history
 

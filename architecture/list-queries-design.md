@@ -143,6 +143,7 @@ Partial indexes exclude cancelled events, which the list never shows.
 | `events_event (lower(title) COLLATE "da-DK-x-icu", id) WHERE cancelled_at IS NULL` | sort by title, Danish order of æ, ø, å |
 | `events_event (created_at, id) WHERE cancelled_at IS NULL` | sort "newest first" |
 | `events_event (host_id, starts_at, id) WHERE cancelled_at IS NULL` | filter "hosted by" plus default sort |
+| `events_event (host_id, ends_at, id)` | "delete my events older than x days" (section 6.3) |
 | `events_event USING gin (search_vector)` | word-prefix search from the first character |
 | `events_event USING gin (title gin_trgm_ops)`, same for `location` | substring search inside words, 3 characters or more |
 | `events_event_audience` primary key `(audience_key, event_id)` and `(event_id)` | visibility, notification routing |
@@ -153,7 +154,7 @@ Partial indexes exclude cancelled events, which the list never shows.
 
 `kind` has five values and gets no index of its own; it is applied as a filter on top of the chosen index. Each index costs write time and space, so the list is limited to the access paths above. Every index is checked with `EXPLAIN (ANALYZE, BUFFERS)` against a seeded dataset before it is kept (see follow-up work).
 
-The list's date window is an overlap test (`ends_at >= :from AND starts_at < :to`). With only an index on `starts_at`, the database would walk every past event to find the ones that are still running. The proposal adds a longest-event rule (an open question for the owner, for example 90 days) and the predicate `starts_at >= :from - interval '90 days'`, so the index scan starts close to `:from`. The alternative is a GiST index on `tstzrange(starts_at, ends_at)`, which handles any length but cannot also deliver the sort order.
+The list's date window is an overlap test (`ends_at >= :from AND starts_at < :to`). With only an index on `starts_at`, the database would walk every past event to find the ones that are still running. The owner approved a longest-event rule on 2026-11-25: an event lasts at most 90 days (a longer stay is entered as two events). The API validates it, a check constraint `CHECK (ends_at <= starts_at + interval '90 days')` enforces it in the database, and the list adds the predicate `starts_at >= :from - interval '90 days'`, so the index scan starts close to `:from`. A GiST index on `tstzrange(starts_at, ends_at)` was the alternative; it handles any length but cannot also deliver the sort order.
 
 ## 4. API contract
 
@@ -186,6 +187,7 @@ Response:
 ```
 
 - `nextCursor` is null on the last page. It encodes the sort, the last row's sort values and id, and a hash of the filters. A cursor sent with different filters or sort answers 400, so the client restarts from the first page.
+- `DELETE /api/v1/events?endedBefore=<date>` deletes the caller's own old events (section 6.3).
 - `GET /api/v1/events/totals` answers the counter-backed totals the viewer may see (section 6.1).
 - `GET /api/v1/events/changes` is the SSE stream (section 8).
 - List responses carry `Cache-Control: no-store`.
@@ -274,7 +276,7 @@ The counter (section 3.3) is exact, read in constant time, and correct at commit
 1. **Time.** The default list is "from today". Yesterday's events leave that window at midnight with no insert, update or delete.
 2. **Per-viewer visibility.** An event can be visible to one viewer through several paths (all members, a group, being invited, hosting it), and a viewer's paths overlap. Adding up per-key counters counts such events twice. An exact per-viewer counter would need one row per member, updated for every member on each `ALL_MEMBERS` event and recomputed when someone joins or leaves a group in the groups module. That is a write fan-out to every member and a dependency on another module's data.
 
-So the proposal uses the counter for totals that are true dimensions of the data (all active events, public events, events I host, events shared with a group) and shows "x of y" in the list with the filtered count. Which totals the UI should show is an open question for the owner.
+So the proposal uses the counter for totals that are true dimensions of the data (all active events, public events, events I host, events shared with a group) and shows "x of y" in the list with the filtered count. The owner confirmed on 2026-11-25 that the list shows "x of y", where y is the filtered count.
 
 **Hot rows.** Every insert into the same key updates the same counter row, and the row lock is held until commit. Concurrent writers on that key would queue behind each other, and every update leaves a dead tuple for vacuum.
 
@@ -290,7 +292,7 @@ So the proposal uses the counter for totals that are true dimensions of the data
 SELECT count(*) AS n FROM (
   SELECT 1 FROM events_event e
   WHERE <same WHERE clause as the page query, without the keyset fragment>
-  LIMIT :cap + 1            -- cap = 1000
+  LIMIT :cap + 1            -- the list's own cap; 1000 for Events
 ) s;
 ```
 
@@ -298,12 +300,35 @@ SELECT count(*) AS n FROM (
 - Runs in the same `REPEATABLE READ READ ONLY` transaction as the first page, so page and count come from one snapshot and cannot contradict each other.
 - Uses the same indexes as the page query. Without `ORDER BY` and the `LATERAL` joins it can often use a bitmap or index-only scan.
 - Above the cap it answers `{ "value": 1000, "exact": false }` and the UI shows "more than 1000". This bounds the worst case (a one-character search over a long history) while staying exact for every realistic family-sized result.
+- The cap is not global. Each list query declares its own cap, and the shared builder has no default, so a new list must choose one. Events uses 1000, set as `samvaer.lists.events.count-cap` so it can be changed per environment without a release.
 
 Rejected for filtered counts:
 
 - `count(*) OVER ()` in the page query: computes every matching row on every page, which removes the benefit of keyset paging.
 - Planner estimates (`EXPLAIN` row estimates, `pg_class.reltuples`): fast but often far off for combined filters and free text.
 - Counter rows per filter combination: the combinations are unbounded once free text is involved.
+
+### 6.3 Deleting old events
+
+The owner chose no automatic retention for now (2026-11-25). Instead a member can delete their own events that ended more than x days ago:
+
+`DELETE /api/v1/events?endedBefore=<date>` (host only: it deletes events where `host_id` is the caller), answering the number of deleted events.
+
+```sql
+-- repeated until it deletes 0 rows; each round is its own transaction
+DELETE FROM events_event e
+WHERE e.id IN (
+  SELECT id FROM events_event
+  WHERE host_id = :viewer AND ends_at < :endedBefore
+  ORDER BY ends_at, id
+  LIMIT 500
+  FOR UPDATE SKIP LOCKED);
+```
+
+- This is a hard delete. Child rows (answers, bring-list, claims, programme, sleeping spots, audience rows) go with it through `ON DELETE CASCADE`, which a changeset adds to the existing foreign keys.
+- The counter and notification triggers run per batch, so the totals stay exact and open sessions refresh.
+- An index `events_event (host_id, ends_at, id)` serves the selection.
+- Only the host's own events are deleted; events a member was invited to are not theirs to delete. What happens to a guest's answers on someone else's old events, and personal data of friends invited by friends (GDPR), is recorded as a later issue.
 
 ## 7. Frontend behaviour
 
@@ -349,7 +374,9 @@ Expectations below are design reasoning, not measurements. They are to be confir
 | Page read | index seek plus at most `limit + 1` rows and their small aggregates; cost does not grow with page number |
 | Many readers | MVCC: readers never block writers or each other; each request holds a pool connection for one short read-only transaction |
 | Typing in search | at most about 4 requests per second per typing user after debounce, each cancelled when superseded; a filtered count only when the filter changes |
-| One-character search | page stays cheap; filtered count bounded by the cap of 1000 rows |
+| One-character search | page stays cheap; filtered count bounded by the list's cap (1000 for Events) |
+| Long history of past events | the 90-day bound starts the index scan near `:from`, so old events do not slow the default list; they still count towards searches with an early `from` and towards index size |
+| "Delete my events older than x days" | runs in batches of 500 rows, each its own short transaction, so locks and trigger work stay small and readers are never blocked; each batch produces one counter upsert and one notification (or `resync`) |
 | Write path | each write pays for the audience, counter and notify triggers: a few extra index updates and one upsert per affected counter key per statement |
 | Concurrent writers on the same key | serialised only within one of 8 slots; no deadlocks thanks to ordered upserts |
 | Series creation (about 104 rows) | statement-level triggers: one aggregate upsert and one notification, not 104 |
