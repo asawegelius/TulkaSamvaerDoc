@@ -1,0 +1,264 @@
+schema_version: 1
+source: https://github.com/asawegelius/documents-template
+baseline:
+  tag: v1.0.1
+  commit: 73473d10d23288857e52c0f43784dd5a39595f74
+managed_scope:
+  ".gitignore":
+    source_path: ".gitignore"
+    ownership: shared
+  "AGENTS.md":
+    source_path: "AGENTS.md"
+    ownership: shared
+  "CHANGELOG.md":
+    source_path: "CHANGELOG.md"
+    ownership: template-managed
+  "CONVENTIONS.md":
+    source_path: "CONVENTIONS.md"
+    ownership: shared
+  "README.md":
+    source_path: "README.md"
+    ownership: shared
+  "UPGRADING.md":
+    source_path: "UPGRADING.md"
+    ownership: template-managed
+  "decisions/README.md":
+    source_path: "decisions/README.md"
+    ownership: shared
+  "examples/README.md":
+    source_path: "examples/README.md"
+    ownership: template-managed
+  "examples/registration/REQ-IDENTITY-001-register-account.md":
+    source_path: "examples/registration/REQ-IDENTITY-001-register-account.md"
+    ownership: template-managed
+  "examples/registration/TEST-IDENTITY-001-register-new-account.md":
+    source_path: "examples/registration/TEST-IDENTITY-001-register-new-account.md"
+    ownership: template-managed
+  "examples/registration/TEST-IDENTITY-002-reject-duplicate-account.md":
+    source_path: "examples/registration/TEST-IDENTITY-002-reject-duplicate-account.md"
+    ownership: template-managed
+  "examples/registration/UC-IDENTITY-001-register-account.md":
+    source_path: "examples/registration/UC-IDENTITY-001-register-account.md"
+    ownership: template-managed
+  "examples/registration/coverage.md":
+    source_path: "examples/registration/coverage.md"
+    ownership: template-managed
+  "examples/template-provenance-legacy.yml":
+    source_path: "examples/template-provenance-legacy.yml"
+    ownership: template-managed
+  "examples/template-provenance.yml":
+    source_path: "examples/template-provenance.yml"
+    ownership: template-managed
+  "git-strategy/01-overview.md":
+    source_path: "git-strategy/01-overview.md"
+    ownership: shared
+  "git-strategy/02-branching-model.md":
+    source_path: "git-strategy/02-branching-model.md"
+    ownership: shared
+  "git-strategy/03-feature-development.md":
+    source_path: "git-strategy/03-feature-development.md"
+    ownership: shared
+  "git-strategy/04-bugfix-handling.md":
+    source_path: "git-strategy/04-bugfix-handling.md"
+    ownership: shared
+  "git-strategy/05-versioning-and-tagging.md":
+    source_path: "git-strategy/05-versioning-and-tagging.md"
+    ownership: shared
+  "git-strategy/06-ci-cd-flow.md":
+    source_path: "git-strategy/06-ci-cd-flow.md"
+    ownership: shared
+  "git-strategy/README.md":
+    source_path: "git-strategy/README.md"
+    ownership: shared
+  "git-strategy/diagrams/branch-overview.png":
+    source_path: "git-strategy/diagrams/branch-overview.png"
+    ownership: shared
+  "git-strategy/diagrams/bugfix-handling.png":
+    source_path: "git-strategy/diagrams/bugfix-handling.png"
+    ownership: shared
+  "git-strategy/diagrams/feature-development-flow.png":
+    source_path: "git-strategy/diagrams/feature-development-flow.png"
+    ownership: shared
+  "glossary/README.md":
+    source_path: "glossary/README.md"
+    ownership: shared
+  "glossary/glossary.md":
+    source_path: "glossary/glossary.md"
+    ownership: shared
+  "requirements/README.md":
+    source_path: "requirements/README.md"
+    ownership: shared
+  "templates/README.md":
+    source_path: "templates/README.md"
+    ownership: template-managed
+  "templates/adr-template.md":
+    source_path: "templates/adr-template.md"
+    ownership: template-managed
+  "templates/api-contract-template.md":
+    source_path: "templates/api-contract-template.md"
+    ownership: template-managed
+  "templates/database-design-review-template.md":
+    source_path: "templates/database-design-review-template.md"
+    ownership: template-managed
+  "templates/functional-requirement-template.md":
+    source_path: "templates/functional-requirement-template.md"
+    ownership: template-managed
+  "templates/logging-standard-template.md":
+    source_path: "templates/logging-standard-template.md"
+    ownership: template-managed
+  "templates/non-functional-requirement-template.md":
+    source_path: "templates/non-functional-requirement-template.md"
+    ownership: template-managed
+  "templates/requirements-template.md":
+    source_path: "templates/requirements-template.md"
+    ownership: template-managed
+  "templates/security-events-template.md":
+    source_path: "templates/security-events-template.md"
+    ownership: template-managed
+  "templates/service-overview-template.md":
+    source_path: "templates/service-overview-template.md"
+    ownership: template-managed
+  "templates/solo-kanban-board-template.md":
+    source_path: "templates/solo-kanban-board-template.md"
+    ownership: template-managed
+  "templates/state-model-template.md":
+    source_path: "templates/state-model-template.md"
+    ownership: template-managed
+  "templates/test-case-template.md":
+    source_path: "templates/test-case-template.md"
+    ownership: template-managed
+  "templates/test-strategy-template.md":
+    source_path: "templates/test-strategy-template.md"
+    ownership: template-managed
+  "templates/threat-model-template.md":
+    source_path: "templates/threat-model-template.md"
+    ownership: template-managed
+  "templates/traceability-matrix-template.md":
+    source_path: "templates/traceability-matrix-template.md"
+    ownership: template-managed
+  "templates/use-case-template.md":
+    source_path: "templates/use-case-template.md"
+    ownership: template-managed
+  "test-cases/README.md":
+    source_path: "test-cases/README.md"
+    ownership: shared
+  "traceability/README.md":
+    source_path: "traceability/README.md"
+    ownership: shared
+  "use-cases/README.md":
+    source_path: "use-cases/README.md"
+    ownership: shared
+capabilities: {}
+exceptions:
+  "AGENTS.md":
+    anchor:
+      state: present
+      release:
+        tag: v1.0.1
+        commit: 73473d10d23288857e52c0f43784dd5a39595f74
+      path: "AGENTS.md"
+    evaluated:
+      tag: v1.0.1
+      commit: 73473d10d23288857e52c0f43784dd5a39595f74
+    disposition: adapted
+    installed_sha256: b9260be49f78cb7ace49ded412bd8bc5d5f983db3fe917ea1c151a5b01822252
+    reason: "Clean git merge-file (project at a037df3, base v1.0.0, target v1.0.1). Keeps the approved local authorization-boundary paragraph (owner decision 2026-11-27) alongside the v1.0.1 guard bullet."
+    decision: "https://github.com/asawegelius/TulkaSamvaerDoc/pull/4#doc011-v1.0.1-adoption-decision"
+  "README.md":
+    anchor:
+      state: present
+      release:
+        tag: v1.0.1
+        commit: 73473d10d23288857e52c0f43784dd5a39595f74
+      path: "README.md"
+    evaluated:
+      tag: v1.0.1
+      commit: 73473d10d23288857e52c0f43784dd5a39595f74
+    disposition: adapted
+    installed_sha256: 6db6622208331330b3750046322c32ef8d9be7986f90e4c7fa671f434853b665
+    reason: "Clean git merge-file of the project README (project at a037df3, base v1.0.0, target v1.0.1). Keeps Tulka's introduction, domains and structure rows; takes the v1.0.1 maturity text."
+    decision: "https://github.com/asawegelius/TulkaSamvaerDoc/pull/4#doc011-v1.0.1-adoption-decision"
+  "git-strategy/01-overview.md":
+    anchor:
+      state: present
+      release:
+        tag: v1.0.1
+        commit: 73473d10d23288857e52c0f43784dd5a39595f74
+      path: "git-strategy/01-overview.md"
+    evaluated:
+      tag: v1.0.1
+      commit: 73473d10d23288857e52c0f43784dd5a39595f74
+    disposition: adapted
+    installed_sha256: 82db6de4bc54a6ea56330ca8476a63a490437eb7fd2951352bd0fb65e27980dc
+    reason: "Owner decision 2026-11-27 (keep the local adaptations): keep the approved TulkaSamvaerDoc wording from a037df3, which attributes template-repository sentences to the upstream template. v1.0.1 rewrote the same lines (git merge-file conflict); its changes to this file are not applied. Project bytes unchanged since a037df3."
+    decision: "https://github.com/asawegelius/TulkaSamvaerDoc/pull/4#doc011-v1.0.1-adoption-decision"
+  "git-strategy/02-branching-model.md":
+    anchor:
+      state: present
+      release:
+        tag: v1.0.1
+        commit: 73473d10d23288857e52c0f43784dd5a39595f74
+      path: "git-strategy/02-branching-model.md"
+    evaluated:
+      tag: v1.0.1
+      commit: 73473d10d23288857e52c0f43784dd5a39595f74
+    disposition: adapted
+    installed_sha256: 4eec1c54b1ada03706b6a340549cfe0d37eb141e401822445c811f734f98fd10
+    reason: "Owner decision 2026-11-27 (keep the local adaptations): keep the approved TulkaSamvaerDoc wording from a037df3, which attributes template-repository sentences to the upstream template. v1.0.1 rewrote the same lines (git merge-file conflict); its changes to this file are not applied. Project bytes unchanged since a037df3."
+    decision: "https://github.com/asawegelius/TulkaSamvaerDoc/pull/4#doc011-v1.0.1-adoption-decision"
+  "git-strategy/05-versioning-and-tagging.md":
+    anchor:
+      state: present
+      release:
+        tag: v1.0.1
+        commit: 73473d10d23288857e52c0f43784dd5a39595f74
+      path: "git-strategy/05-versioning-and-tagging.md"
+    evaluated:
+      tag: v1.0.1
+      commit: 73473d10d23288857e52c0f43784dd5a39595f74
+    disposition: adapted
+    installed_sha256: 8e653bed65bf58f125ea3e4e258085025058ac88591d611c753507bda1680700
+    reason: "Owner decision 2026-11-27 (keep the local adaptations): keep the approved TulkaSamvaerDoc wording from a037df3, which attributes template-repository sentences to the upstream template. v1.0.1 rewrote the same lines (git merge-file conflict); its changes to this file are not applied. Project bytes unchanged since a037df3."
+    decision: "https://github.com/asawegelius/TulkaSamvaerDoc/pull/4#doc011-v1.0.1-adoption-decision"
+  "git-strategy/06-ci-cd-flow.md":
+    anchor:
+      state: present
+      release:
+        tag: v1.0.1
+        commit: 73473d10d23288857e52c0f43784dd5a39595f74
+      path: "git-strategy/06-ci-cd-flow.md"
+    evaluated:
+      tag: v1.0.1
+      commit: 73473d10d23288857e52c0f43784dd5a39595f74
+    disposition: adapted
+    installed_sha256: c902329bb4efb4905949a43b2c539bb196bf78cac1c45c4300d8758e38d3b93a
+    reason: "Owner decision 2026-11-27 (keep the local adaptations): keep the approved TulkaSamvaerDoc wording from a037df3, which attributes template-repository sentences to the upstream template. v1.0.1 rewrote the same lines (git merge-file conflict); its changes to this file are not applied. Project bytes unchanged since a037df3."
+    decision: "https://github.com/asawegelius/TulkaSamvaerDoc/pull/4#doc011-v1.0.1-adoption-decision"
+  "git-strategy/README.md":
+    anchor:
+      state: present
+      release:
+        tag: v1.0.1
+        commit: 73473d10d23288857e52c0f43784dd5a39595f74
+      path: "git-strategy/README.md"
+    evaluated:
+      tag: v1.0.1
+      commit: 73473d10d23288857e52c0f43784dd5a39595f74
+    disposition: adapted
+    installed_sha256: 22abe1b072924e91507e9dcf5652d52ee82734a44b5015295bc43709fc16754d
+    reason: "Owner decision 2026-11-27 (keep the local adaptations): keep the approved TulkaSamvaerDoc wording from a037df3, which attributes template-repository sentences to the upstream template. v1.0.1 rewrote the same lines (git merge-file conflict); its changes to this file are not applied. Project bytes unchanged since a037df3."
+    decision: "https://github.com/asawegelius/TulkaSamvaerDoc/pull/4#doc011-v1.0.1-adoption-decision"
+  "glossary/glossary.md":
+    anchor:
+      state: present
+      release:
+        tag: v1.0.1
+        commit: 73473d10d23288857e52c0f43784dd5a39595f74
+      path: "glossary/glossary.md"
+    evaluated:
+      tag: v1.0.1
+      commit: 73473d10d23288857e52c0f43784dd5a39595f74
+    disposition: adapted
+    installed_sha256: f34cb7088e2e7b816ab85833e26db26484c7dddefcac210a8cb94a21648fa4c6
+    reason: "Upstream glossary/glossary.md is unchanged through v1.0.1. Keep Tulka's project glossary terms (project bytes unchanged since the base)."
+    decision: "https://github.com/asawegelius/TulkaSamvaerDoc/pull/4#doc011-v1.0.1-adoption-decision"

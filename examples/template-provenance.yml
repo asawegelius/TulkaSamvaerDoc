@@ -1,0 +1,40 @@
+# Adapted example. Resolve both tags and replace synthetic identities and decisions.
+schema_version: 1
+source: https://github.com/asawegelius/documents-template
+baseline:
+  tag: v1.0.0
+  commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+managed_scope:
+  .gitignore:
+    source_path: .gitignore
+    ownership: shared
+  README.md:
+    source_path: README.md
+    ownership: shared
+  UPGRADING.md:
+    source_path: UPGRADING.md
+    ownership: template-managed
+  templates/test-case-template.md:
+    source_path: templates/test-case-template.md
+    ownership: template-managed
+capabilities: {}
+exceptions:
+  README.md:
+    anchor:
+      state: present
+      release: {tag: v1.0.1, commit: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb}
+      path: README.md
+    evaluated: {tag: v1.0.1, commit: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb}
+    disposition: adapted
+    installed_sha256: 0c6ef99ea37503c18f28b93eca37457f265254ff2c45cab63da03ce9c95bc4a1
+    reason: Keep the project's handbook introduction after reviewing the new upstream introduction.
+    decision: Example review 2
+  templates/test-case-template.md:
+    anchor:
+      state: present
+      release: {tag: v1.0.0, commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa}
+      path: templates/test-case-template.md
+    evaluated: {tag: v1.0.1, commit: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb}
+    disposition: deferred
+    reason: Review the changed test template with the project test owner first.
+    decision: Example review 2

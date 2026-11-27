@@ -48,13 +48,14 @@ Use additional architecture, API, state, security and operational templates when
 
 ## Adopting this template
 
+- Start with the named adopter archive from a published release or open a scoped upgrade PR for an existing project. [Adoption and verification guide](UPGRADING.md)
 - Replace this introduction with the project's purpose, scope and entry points.
 - Choose domain prefixes, document owners, reviewers and the project's Definition of Done.
 - Keep illustrative records in `examples/` or remove that folder; never count them as project evidence.
-- Choose a branching and release model. The supplied `develop` / `test` / `main` model is an option.
+- Choose a branching and release model. The supplied Git strategy supports `develop` and `main` with optional shared staging.
 - Configure actual validation commands and required checks. No CI or branch protections are installed by this template.
 - Choose a license before distributing the template for reuse; no license is currently supplied.
 
 ## Current maturity
 
-This is a documentation starter. Relationships and status values are defined in `CONVENTIONS.md`; automated schema validation, generated coverage and CI enforcement are future work. The versioning and CI/CD chapters in `git-strategy/` are currently empty placeholders.
+This is a documentation starter. [Conventions](CONVENTIONS.md) govern project records and traceability. The [Git strategy](git-strategy/README.md) describes project workflows. For template adoption and upgrades, follow [UPGRADING.md](UPGRADING.md).

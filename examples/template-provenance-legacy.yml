@@ -1,0 +1,16 @@
+# Initialization example. Existing files and modes stay unchanged at this step.
+schema_version: 1
+source: https://github.com/asawegelius/documents-template
+baseline: null
+managed_scope:
+  .gitignore:
+    source_path: .gitignore
+    ownership: shared
+  README.md:
+    source_path: README.md
+    ownership: shared
+  templates/test-case-template.md:
+    source_path: templates/test-case-template.md
+    ownership: template-managed
+capabilities: {}
+exceptions: {}

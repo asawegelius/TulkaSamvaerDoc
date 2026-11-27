@@ -76,3 +76,5 @@ This is a proposed validation contract; no validator or CI enforcement is includ
 5. Evidence fields for executed tests, especially `passed`; evidence relevance to the target revision remains a review responsibility.
 
 Separate structural checks from semantic review. A script can establish that a link resolves; a reviewer must establish that the test proves the requirement.
+
+Project records and their evidence belong to the adopting project. When creating a record from a template, set its navigation links relative to its final location and check that the adopted policy, skill and reference targets resolve. Use the [upgrade procedure](UPGRADING.md) for changes to managed and shared template files.
