@@ -58,4 +58,4 @@ Use additional architecture, API, state, security and operational templates when
 
 ## Current maturity
 
-This is a documentation starter. [Conventions](CONVENTIONS.md) govern project records and traceability. The [Git strategy](git-strategy/README.md) covers verification and template releases. When adapting the starter, choose and run the checks that apply to your project.
+This is a documentation starter. [Conventions](CONVENTIONS.md) govern project records and traceability. The [Git strategy](git-strategy/README.md) describes project workflows. For template adoption and upgrades, follow [UPGRADING.md](UPGRADING.md).
