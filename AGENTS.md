@@ -28,4 +28,8 @@ Read [README.md](README.md) and [CONVENTIONS.md](CONVENTIONS.md) before changing
 
 ## Git guidance
 
-Use a task branch and pull request when working through GitHub. Existing Git chapters describe an optional promotion model and include direct merge commands; apply repository protections and the user's authorization before using them. Do not create environment branches, merge, tag or deploy merely to follow those examples.
+Use a task branch and pull request when working through GitHub. Follow the [Git strategy](git-strategy/README.md) and the project's authorization for integration, promotion and release.
+
+Examples, templates and documented procedures do not themselves authorize agents to create environment branches, merge, tag, publish releases or deploy. Such actions require authorization under the applicable project governance.
+
+For an approved template adoption, follow the [upgrade procedure](UPGRADING.md). Pin the revisions, obtain scope approval and preserve project-owned records. Record the result and effective source anchors in the adoption PR.

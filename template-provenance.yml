@@ -1,6 +1,8 @@
 schema_version: 1
 source: https://github.com/asawegelius/documents-template
-baseline: null
+baseline:
+  tag: v1.0.0
+  commit: 586d3661cb633adacbef4395a41d952ab8471a44
 managed_scope:
   ".gitignore":
     source_path: ".gitignore"
@@ -8,12 +10,18 @@ managed_scope:
   "AGENTS.md":
     source_path: "AGENTS.md"
     ownership: shared
+  "CHANGELOG.md":
+    source_path: "CHANGELOG.md"
+    ownership: template-managed
   "CONVENTIONS.md":
     source_path: "CONVENTIONS.md"
     ownership: shared
   "README.md":
     source_path: "README.md"
     ownership: shared
+  "UPGRADING.md":
+    source_path: "UPGRADING.md"
+    ownership: template-managed
   "decisions/README.md":
     source_path: "decisions/README.md"
     ownership: shared
@@ -34,6 +42,9 @@ managed_scope:
     ownership: template-managed
   "examples/registration/coverage.md":
     source_path: "examples/registration/coverage.md"
+    ownership: template-managed
+  "examples/template-provenance.yml":
+    source_path: "examples/template-provenance.yml"
     ownership: template-managed
   "git-strategy/01-overview.md":
     source_path: "git-strategy/01-overview.md"
@@ -135,4 +146,116 @@ managed_scope:
     source_path: "use-cases/README.md"
     ownership: shared
 capabilities: {}
-exceptions: {}
+exceptions:
+  "AGENTS.md":
+    anchor:
+      state: present
+      release:
+        tag: v1.0.0
+        commit: 586d3661cb633adacbef4395a41d952ab8471a44
+      path: "AGENTS.md"
+    evaluated:
+      tag: v1.0.0
+      commit: 586d3661cb633adacbef4395a41d952ab8471a44
+    disposition: adapted
+    installed_sha256: 919326afc33bcc1f053dd48fbb2b575c208746139150417e989849ce44320a8b
+    reason: "v1.0.0 text plus the retained authorization boundary: examples, templates and documented procedures do not themselves authorize agents to create environment branches, merge, tag, publish releases or deploy."
+    decision: "Approved by Åsa Wegelius in the TulkaSamvaerDoc v1.0.0 adoption plan review, 2026-11-27 (condition 1)"
+  "README.md":
+    anchor:
+      state: present
+      release:
+        tag: v1.0.0
+        commit: 586d3661cb633adacbef4395a41d952ab8471a44
+      path: "README.md"
+    evaluated:
+      tag: v1.0.0
+      commit: 586d3661cb633adacbef4395a41d952ab8471a44
+    disposition: adapted
+    installed_sha256: b9148184f5a4e7f4f0b09222889ce76336d576e8dfb32f40b4636dad689cd6ff
+    reason: "Clean git merge-file of the project README (base: untagged upstream 87e14fd15356d01b0672930a3a282b1914ca2a1f, target: v1.0.0). Keeps Tulka's introduction, domains and structure rows; takes the v1.0.0 adoption and maturity text. Recorded as an adaptation because the pre-release base cannot be a provenance anchor."
+    decision: "Approved by Åsa Wegelius in the TulkaSamvaerDoc v1.0.0 adoption plan review, 2026-11-27"
+  "git-strategy/01-overview.md":
+    anchor:
+      state: present
+      release:
+        tag: v1.0.0
+        commit: 586d3661cb633adacbef4395a41d952ab8471a44
+      path: "git-strategy/01-overview.md"
+    evaluated:
+      tag: v1.0.0
+      commit: 586d3661cb633adacbef4395a41d952ab8471a44
+    disposition: adapted
+    installed_sha256: 82db6de4bc54a6ea56330ca8476a63a490437eb7fd2951352bd0fb65e27980dc
+    reason: "Narrow applicability adaptation (plan review condition 3): sentences that describe the upstream template repository are attributed to it so they are not read as rules for this project. No other wording changes."
+    decision: "Approved by Åsa Wegelius in the TulkaSamvaerDoc v1.0.0 adoption plan review, 2026-11-27 (condition 3)"
+  "git-strategy/02-branching-model.md":
+    anchor:
+      state: present
+      release:
+        tag: v1.0.0
+        commit: 586d3661cb633adacbef4395a41d952ab8471a44
+      path: "git-strategy/02-branching-model.md"
+    evaluated:
+      tag: v1.0.0
+      commit: 586d3661cb633adacbef4395a41d952ab8471a44
+    disposition: adapted
+    installed_sha256: 4eec1c54b1ada03706b6a340549cfe0d37eb141e401822445c811f734f98fd10
+    reason: "Narrow applicability adaptation (plan review condition 3): sentences that describe the upstream template repository are attributed to it so they are not read as rules for this project. No other wording changes."
+    decision: "Approved by Åsa Wegelius in the TulkaSamvaerDoc v1.0.0 adoption plan review, 2026-11-27 (condition 3)"
+  "git-strategy/05-versioning-and-tagging.md":
+    anchor:
+      state: present
+      release:
+        tag: v1.0.0
+        commit: 586d3661cb633adacbef4395a41d952ab8471a44
+      path: "git-strategy/05-versioning-and-tagging.md"
+    evaluated:
+      tag: v1.0.0
+      commit: 586d3661cb633adacbef4395a41d952ab8471a44
+    disposition: adapted
+    installed_sha256: 8e653bed65bf58f125ea3e4e258085025058ac88591d611c753507bda1680700
+    reason: "Narrow applicability adaptation (plan review condition 3): adds a scope note that the chapter describes upstream template releases and that the adopted release is recorded in template-provenance.yml. The project's own release versioning stays undefined, as it was before adoption."
+    decision: "Approved by Åsa Wegelius in the TulkaSamvaerDoc v1.0.0 adoption plan review, 2026-11-27 (condition 3)"
+  "git-strategy/06-ci-cd-flow.md":
+    anchor:
+      state: present
+      release:
+        tag: v1.0.0
+        commit: 586d3661cb633adacbef4395a41d952ab8471a44
+      path: "git-strategy/06-ci-cd-flow.md"
+    evaluated:
+      tag: v1.0.0
+      commit: 586d3661cb633adacbef4395a41d952ab8471a44
+    disposition: adapted
+    installed_sha256: c902329bb4efb4905949a43b2c539bb196bf78cac1c45c4300d8758e38d3b93a
+    reason: "Narrow applicability adaptation (plan review condition 3): sentences that describe the upstream template repository are attributed to it so they are not read as rules for this project. No other wording changes."
+    decision: "Approved by Åsa Wegelius in the TulkaSamvaerDoc v1.0.0 adoption plan review, 2026-11-27 (condition 3)"
+  "git-strategy/README.md":
+    anchor:
+      state: present
+      release:
+        tag: v1.0.0
+        commit: 586d3661cb633adacbef4395a41d952ab8471a44
+      path: "git-strategy/README.md"
+    evaluated:
+      tag: v1.0.0
+      commit: 586d3661cb633adacbef4395a41d952ab8471a44
+    disposition: adapted
+    installed_sha256: 22abe1b072924e91507e9dcf5652d52ee82734a44b5015295bc43709fc16754d
+    reason: "Narrow applicability adaptation (plan review condition 3): sentences that describe the upstream template repository are attributed to it so they are not read as rules for this project. No other wording changes."
+    decision: "Approved by Åsa Wegelius in the TulkaSamvaerDoc v1.0.0 adoption plan review, 2026-11-27 (condition 3)"
+  "glossary/glossary.md":
+    anchor:
+      state: present
+      release:
+        tag: v1.0.0
+        commit: 586d3661cb633adacbef4395a41d952ab8471a44
+      path: "glossary/glossary.md"
+    evaluated:
+      tag: v1.0.0
+      commit: 586d3661cb633adacbef4395a41d952ab8471a44
+    disposition: adapted
+    installed_sha256: f34cb7088e2e7b816ab85833e26db26484c7dddefcac210a8cb94a21648fa4c6
+    reason: "Upstream glossary/glossary.md is unchanged between 87e14fd and v1.0.0. Keep Tulka's project glossary terms (current project bytes) on top of the v1.0.0 file."
+    decision: "Approved by Åsa Wegelius in the TulkaSamvaerDoc v1.0.0 adoption plan review, 2026-11-27"

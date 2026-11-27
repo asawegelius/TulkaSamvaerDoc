@@ -1,0 +1,15 @@
+# Illustration only. Resolve the tag and replace the synthetic commit before adoption.
+schema_version: 1
+source: https://github.com/asawegelius/documents-template
+baseline:
+  tag: v1.0.0
+  commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+managed_scope:
+  AGENTS.md:
+    source_path: AGENTS.md
+    ownership: shared
+  templates/test-case-template.md:
+    source_path: templates/test-case-template.md
+    ownership: template-managed
+capabilities: {}
+exceptions: {}
